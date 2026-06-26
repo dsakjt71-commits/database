@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>database.abstractions</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Tyouqu</Authors>
+    <Description>Reusable database abstractions for Tyouqu services.</Description>
+    <RepositoryUrl>https://github.com/dsakjt71-commits/database.git</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\..\docs\component-docs\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+
+
+
+

@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Tyouqu.Database.Abstractions\Tyouqu.Database.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.8" />
+  </ItemGroup>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>database.dapper</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Tyouqu</Authors>
+    <Description>Dapper implementation with external SQL template support.</Description>
+    <RepositoryUrl>https://github.com/dsakjt71-commits/database.git</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\..\docs\component-docs\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
+
+
+
+
