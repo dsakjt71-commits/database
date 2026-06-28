@@ -1,12 +1,12 @@
 # database
 
-`database` 是一个轻量级 SQL 模板数据库访问组件，当前提供 .NET 和 Java 两套实现。
+`database` 是一个轻量级 SQL 模板数据库访问组件，当前提供 .NET、Java 和 Python 三套实现。
 
 它的目标不是替代 ORM，而是解决一类更朴素的问题：业务项目希望 SQL 仍然放在 `.sql` 文件中维护，同时复用统一的连接、参数绑定、分页、SQL 模板加载和多数据库适配能力。
 
 ## 核心特性
 
-- 支持 .NET 和 Java。
+- 支持 .NET、Java 和 Python。
 - 支持 SQL Server、MySQL、PostgreSQL、SQLite。
 - SQL 使用外部 `.sql` 文件维护。
 - SQL ID 等于文件名去掉 `.sql` 后缀。
@@ -14,6 +14,7 @@
 - 支持执行、查询单行、查询列表、分页查询。
 - .NET 版基于 Dapper。
 - Java 版基于 JDBC，不强依赖 Spring。
+- Python 版基于标准库 sqlite3，默认零运行时外部依赖。
 
 ## 目录结构
 
@@ -21,6 +22,7 @@
 database/
   dotnet/     .NET 实现、测试和 Demo
   java/       Java JDBC 实现和测试
+  python/     Python 实现和测试
   docs/       设计文档、接入文档和组件说明
 ```
 
@@ -85,7 +87,15 @@ sql/
 - 文件内容不能为空。
 - 不再支持 `-- @id` 标记，避免 SQL ID 与文件名不一致。
 
-示例：
+常用 SQL 模板示例：
+
+1. 按 ID 查询用户
+
+文件路径：
+
+```text
+sql/common/auth/auth.user.getById.sql
+```
 
 ```sql
 select id, username, email
@@ -93,7 +103,111 @@ from users
 where id = :userId
 ```
 
-Java 版使用 `:userId` 形式的命名参数。  
+SQL ID：
+
+```text
+auth.user.getById
+```
+
+调用时传入同名参数：
+
+```csharp
+await sql.QuerySingleOrDefaultByIdAsync<User>(
+    "auth.user.getById",
+    new { userId = 1001 });
+```
+
+2. 判断用户是否存在
+
+文件路径：
+
+```text
+sql/common/auth/auth.user.exists.sql
+```
+
+```sql
+select count(1)
+from users
+where username = :username
+```
+
+3. 新增用户
+
+文件路径：
+
+```text
+sql/common/auth/auth.user.create.sql
+```
+
+```sql
+insert into users (username, email, created_at)
+values (:username, :email, :createdAt)
+```
+
+4. 更新最后登录时间
+
+文件路径：
+
+```text
+sql/common/auth/auth.user.updateLastLogin.sql
+```
+
+```sql
+update users
+set last_login_at = :lastLoginAt
+where id = :userId
+```
+
+5. 分页查询
+
+文件路径：
+
+```text
+sql/common/auth/auth.user.search.sql
+```
+
+```sql
+select id, username, email, created_at
+from users
+where (:keyword is null or username like :keyword or email like :keyword)
+  and (:status is null or status = :status)
+order by created_at desc, id desc
+```
+
+调用分页接口时，组件会基于该 SQL 生成 count SQL 和数据库对应的分页 SQL。SQL Server 分页尤其需要稳定的 `order by`。
+
+6. 数据库专用 SQL 覆盖
+
+如果通用 SQL 无法兼容某个数据库，可以在 provider 目录下放同名文件覆盖 `common`。
+
+通用文件：
+
+```text
+sql/common/auth/auth.user.latest.sql
+```
+
+```sql
+select id, username, email, created_at
+from users
+order by created_at desc
+```
+
+MySQL 专用文件：
+
+```text
+sql/mysql/auth/auth.user.latest.sql
+```
+
+```sql
+select id, username, email, created_at
+from users
+order by created_at desc
+limit :take
+```
+
+当 Provider 是 MySQL 时，`auth.user.latest` 会使用 `sql/mysql/auth/auth.user.latest.sql`；其他数据库没有同名覆盖时继续使用 `common`。
+
+Java 版和 Python 版使用 `:userId` 形式的命名参数。  
 .NET 版使用 Dapper，SQL Server / MySQL / PostgreSQL / SQLite 均可按组件约定传入参数对象。
 
 ## .NET 版
