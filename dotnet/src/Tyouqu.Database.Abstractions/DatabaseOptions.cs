@@ -11,5 +11,29 @@ public sealed class DatabaseOptions
     public bool EnableSensitiveLogging { get; set; }
 
     public SqlTemplateOptions SqlTemplates { get; set; } = new();
+
+    public SqlExecutionLogOptions SqlLogging { get; set; } = new();
+
+    public SqlSafetyOptions Safety { get; set; } = new();
+}
+
+public sealed class SqlExecutionLogOptions
+{
+    public bool Enabled { get; set; }
+
+    public bool LogSql { get; set; } = true;
+
+    public bool LogParameters { get; set; }
+
+    public bool LogOnlySlowSql { get; set; }
+
+    public int SlowSqlThresholdMs { get; set; } = 500;
+}
+
+public sealed class SqlSafetyOptions
+{
+    public bool BlockFullTableUpdate { get; set; } = true;
+
+    public bool BlockFullTableDelete { get; set; } = true;
 }
 

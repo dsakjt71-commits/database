@@ -81,6 +81,53 @@ public class SqliteProviderTests : IDisposable
         multi.Second[0].Enabled.Should().Be(2);
     }
 
+    [Fact]
+    public async Task SqliteProvider_ShouldBlockFullTableDelete()
+    {
+        WriteSql("demo.schema.sql", """
+            create table apps (
+                app_id integer primary key,
+                app_name text not null
+            );
+
+            insert into apps(app_id, app_name) values (1, 'App A');
+            """);
+        WriteSql("demo.deleteAll.sql", "delete from apps");
+
+        var db = CreateExecutor();
+
+        await db.ExecuteByIdAsync("demo.schema");
+        var act = () => db.ExecuteByIdAsync("demo.deleteAll");
+
+        await act.Should().ThrowAsync<TyouquDatabaseException>()
+            .WithMessage("*DELETE without WHERE*");
+    }
+
+    [Fact]
+    public async Task SqliteProvider_ShouldWriteSqlExecutionLogWhenEnabled()
+    {
+        var executionLogger = new CaptureSqlExecutionLogger();
+        WriteSql("demo.schema.sql", """
+            create table apps (
+                app_id integer primary key,
+                app_name text not null
+            );
+            """);
+
+        var db = CreateExecutor(options =>
+        {
+            options.SqlLogging.Enabled = true;
+            options.SqlLogging.LogSql = true;
+        }, services => services.AddSingleton<ISqlExecutionLogger>(executionLogger));
+
+        await db.ExecuteByIdAsync("demo.schema");
+
+        executionLogger.Logs.Should().ContainSingle();
+        executionLogger.Logs[0].Sql.Should().Contain("create table apps");
+        executionLogger.Logs[0].ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(0);
+        executionLogger.Logs[0].Succeeded.Should().BeTrue();
+    }
+
     public void Dispose()
     {
         _serviceProvider?.Dispose();
@@ -91,15 +138,19 @@ public class SqliteProviderTests : IDisposable
             Directory.Delete(testRoot, recursive: true);
     }
 
-    private ISqlTemplateExecutor CreateExecutor()
+    private ISqlTemplateExecutor CreateExecutor(
+        Action<DatabaseOptions>? configure = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        configureServices?.Invoke(services);
         services.AddTyouquSqliteDatabase(options =>
         {
             options.Provider = DatabaseProvider.Sqlite;
             options.ConnectionString = $"Data Source={_dbPath}";
             options.SqlTemplates.RootPath = _rootPath;
+            configure?.Invoke(options);
         });
 
         _serviceProvider = services.BuildServiceProvider();
@@ -125,5 +176,16 @@ public class SqliteProviderTests : IDisposable
         public int Total { get; set; }
 
         public int Enabled { get; set; }
+    }
+
+    private sealed class CaptureSqlExecutionLogger : ISqlExecutionLogger
+    {
+        public List<SqlExecutionLog> Logs { get; } = [];
+
+        public Task LogAsync(SqlExecutionLog log, CancellationToken cancellationToken = default)
+        {
+            Logs.Add(log);
+            return Task.CompletedTask;
+        }
     }
 }

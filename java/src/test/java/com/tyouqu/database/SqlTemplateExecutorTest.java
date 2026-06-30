@@ -8,10 +8,12 @@ import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SqlTemplateExecutorTest {
     @TempDir
@@ -38,6 +40,42 @@ class SqlTemplateExecutorTest {
 
         assertEquals(3, result.totalCount());
         assertEquals(List.of(new UserRow(2, "Bob")), result.items());
+    }
+
+    @Test
+    void blocksFullTableDelete() {
+        JdbcDbExecutor db = new JdbcDbExecutor(createDataSource());
+        db.execute("create table users(id int primary key, name varchar(64))", Map.of());
+
+        TyouquDatabaseException exception = assertThrows(
+            TyouquDatabaseException.class,
+            () -> db.execute("delete from users", Map.of())
+        );
+
+        assertEquals("Unsafe SQL was blocked: DELETE without WHERE is not allowed.", exception.getMessage());
+    }
+
+    @Test
+    void writesExecutionLogWhenEnabled() {
+        List<SqlExecutionLog> logs = new ArrayList<>();
+        DatabaseOptions options = DatabaseOptions.builder()
+            .provider(DatabaseProvider.SQLITE)
+            .enableSensitiveLogging(true)
+            .sqlLogging(new SqlExecutionLogOptions(true, true, true, false, 500))
+            .build();
+        JdbcDbExecutor db = new JdbcDbExecutor(
+            createDataSource(),
+            options,
+            List.of(new FullTableOperationInterceptor(options.safety())),
+            List.of(logs::add)
+        );
+
+        db.execute("create table users(id int primary key, name varchar(64))", Map.of());
+
+        assertEquals(1, logs.size());
+        assertEquals(SqlExecutionKind.EXECUTE, logs.get(0).kind());
+        assertEquals(DatabaseProvider.SQLITE, logs.get(0).provider());
+        assertEquals(true, logs.get(0).succeeded());
     }
 
     private SqlTemplateExecutor createExecutor() throws IOException {

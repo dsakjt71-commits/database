@@ -2,7 +2,7 @@
 
 `database` 是一个轻量级 SQL 模板数据库访问组件，当前提供 .NET、Java 和 Python 三套实现。
 
-它的目标不是替代 ORM，而是解决一类更朴素的问题：业务项目希望 SQL 仍然放在 `.sql` 文件中维护，同时复用统一的连接、参数绑定、分页、SQL 模板加载和多数据库适配能力。
+它的目标不是替代 ORM，而是将业务项目中的 SQL 代码不再写死在代码中，而是单独存储为 `.sql` 文件，方便维护；在修改数据库结构时不需要重新编译代码，提高维护的灵活性，同时复用统一的连接、参数绑定、分页、SQL 模板加载和多数据库适配能力。
 
 ## 核心特性
 
@@ -499,6 +499,73 @@ dataSource.setMaximumPoolSize(30);
 ### SQL 模板加载
 
 `FileSqlTemplateStore` 会把 SQL 模板加载到内存中，查询时按 SQL ID 从内存读取。修改 SQL 文件后，生产环境建议通过发布流程重启服务，或者显式调用 reload 能力。
+
+### 执行日志与安全拦截
+
+组件执行 SQL 时支持记录执行日志和慢 SQL 标记。日志内容包含数据库类型、执行类型、耗时、影响行数、返回行数、是否成功和异常信息；是否输出 SQL 文本、参数和是否只记录慢 SQL 由配置决定。
+
+.NET 配置示例：
+
+```csharp
+builder.Services.AddTyouquDatabase(options =>
+{
+    options.SqlLogging.Enabled = true;
+    options.SqlLogging.LogSql = true;
+    options.SqlLogging.LogOnlySlowSql = false;
+    options.SqlLogging.SlowSqlThresholdMs = 500;
+});
+```
+
+Java 配置示例：
+
+```java
+DatabaseOptions options = DatabaseOptions.builder()
+    .provider(DatabaseProvider.MYSQL)
+    .enableSensitiveLogging(false)
+    .sqlLogging(new SqlExecutionLogOptions(true, true, false, false, 500))
+    .build();
+
+JdbcDbExecutor db = new JdbcDbExecutor(
+    dataSource,
+    options,
+    List.of(new FullTableOperationInterceptor(options.safety())),
+    List.of(new ConsoleSqlExecutionLogger())
+);
+```
+
+Python 配置示例：
+
+```python
+logs = []
+options = DatabaseOptions(
+    provider=DatabaseProvider.SQLITE,
+    connection_factory=lambda: sqlite3.connect("app.db"),
+    enable_sensitive_logging=False,
+    sql_logging=SqlExecutionLogOptions(
+        enabled=True,
+        log_sql=True,
+        log_parameters=False,
+        slow_sql_threshold_ms=500,
+    ),
+)
+
+db = SqliteDbExecutor(
+    options.connection_factory,
+    options,
+    execution_loggers=[logs.append],
+)
+```
+
+参数日志默认不输出。只有同时开启 `LogParameters` 和 `EnableSensitiveLogging` 时才会记录参数，生产环境建议谨慎开启。
+
+内置安全拦截器会阻断没有 `where` 条件的全表 `update` 和 `delete`：
+
+```sql
+delete from users
+update users set status = 0
+```
+
+如果业务确实需要执行这类维护 SQL，可以通过配置关闭对应阻断项，或者后续扩展白名单拦截器。
 
 ### 分页 SQL 要求
 

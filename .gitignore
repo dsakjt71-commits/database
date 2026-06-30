@@ -9,3 +9,5 @@ target/
 *.snupkg
 *.log
 artifacts/
+__pycache__/
+*.pyc
